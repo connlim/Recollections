@@ -92,7 +92,7 @@ const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-app.get('/', auth, (req, res) => {
+app.get('/',(req, res) => {
   res.status(200).send('Received at backend service.');
 });
 
