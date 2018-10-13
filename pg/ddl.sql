@@ -54,5 +54,5 @@ CREATE TABLE IF NOT EXISTS event_clique_image (
 );
 
 
-INSERT INTO events (id, name, location, date)
-VALUES ()
+INSERT INTO events (name, location, date)
+VALUES ("SDYC", "NUS High School", 1534660022)
