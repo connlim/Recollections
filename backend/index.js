@@ -51,9 +51,9 @@ const uniqid = require('uniqid');
 
 const insert_file = (userid, file) => {
   return new Promise((resolve, reject) => {
-   const ext = fileType(file).ext;
-   const id = `${uniqid()}.${ext}`;
-   mClient.putObject('recollections', id, file, (put_err, etag) => {
+    const ext = fileType(file).ext;
+    const id = `${uniqid()}.${ext}`;
+    mClient.putObject('recollections', id, file, (put_err, etag) => {
      if(put_err){
         console.log(put_err);
         reject({
@@ -96,18 +96,18 @@ app.get('/',(req, res) => {
 app.get('/feed', auth, (req, res) => {
   db.query(
     ```
-    SELECT DISTINCT e.name, e.location, e.date, array_agg(i.uri) AS images 
+    SELECT DISTINCT e.name, e.location, e.date, array_agg(i.uri) AS images
     FROM (
-          SELECT DISTINCT event 
-            FROM users_in_event 
+          SELECT DISTINCT event
+            FROM users_in_event
             WHERE userid IN (
-                SELECT DISTINCT userid 
-                    FROM users_in_clique 
+                SELECT DISTINCT userid
+                    FROM users_in_clique
                     WHERE clique IN (
                         SELECT clique FROM users_in_clique WHERE userid=$1
                     ) AND userid<>$1 )
-         ) e, event_clique_image eci, images i 
-    WHERE e.id = eci.event AND eci.image = i.id 
+         ) e, event_clique_image eci, images i
+    WHERE e.id = eci.event AND eci.image = i.id
     GROUP BY e.name, e.location, e.date;
     ```, [req.user]).then((db_res) => {
       res.status(200).send(db_res.rows);
@@ -138,15 +138,17 @@ app.post('/login', (req, res) => {
   }
 });
 
-app.post('/signup', upload.single('profile_pic'), (req, res) => {
+app.post('/signup', upload.array('profile_pic', 3), (req, res) => {
   if(!req.body.email) {
     res.status(400).send('No email');
   } else if(!req.body.username) {
     res.status(400).send('No username');
   } else if(!req.body.password) {
     res.status(400).send('No email');
-  } else if(!req.file) {
-    res.status(400).send('No email');
+  } else if(!req.files) {
+    res.status(400).send('No profile pic');
+  } else if(req.files.length < 3) {
+    res.status(400).send('Not enough pics');
   } else {
     db.query('SELECT 1 FROM users WHERE email = $1', [
       req.body.email
@@ -154,14 +156,18 @@ app.post('/signup', upload.single('profile_pic'), (req, res) => {
       if(db_res.rows.length > 0) {
         throw { code: 400, message: "User already exists" };
       } else {
-        return insert_file(req.body.email, req.file.buffer);
+        return Promise.all(req.files.map((file) => {
+          return insert_file(req.body.email, file.buffer);
+        }));
       }
-    }).then((profile_id) => {
-      return db.query('INSERT INTO users (email, username, password, profile_pic_1) VALUES ($1, $2, $3, $4)', [
+    }).then((profile_ids) => {
+      return db.query('INSERT INTO users (email, username, password, profile_pic_1, profile_pic_2, profile_pic_3) VALUES ($1, $2, $3, $4, $5, $6)', [
         req.body.email,
         req.body.username,
         req.body.password,
-        profile_id,
+        profile_ids[0],
+        profile_ids[1],
+        profile_ids[2],
       ]);
     }).then(() => {
       res.status(200).send('Success');
