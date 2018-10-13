@@ -52,6 +52,11 @@ CREATE TABLE IF NOT EXISTS event_clique_image (
   PRIMARY KEY (event, image, clique)
 );
 
+INSERT INTO users (email, username, password, profile_pic_1, profile_pic_2, profile_pic_3)
+VALUES ('test@foo.com', 'test', 'password', 'eewk41jn7jrjmq.jpg', 'eewk41jn7jrjmr.jpg', 'eewk41jn7jrjms.jpg'),
+('test1@foo.com', 'test1', 'password', 'eewk41jn7ko0iz.jpg', 'eewk41jn7ko0j0.jpg', 'eewk41jn7ko0j1.jpg'),
+('test2@foo.com', 'test2', 'password', 'eewk41jn7krjz8.jpg', 'eewk41jn7krjz9.jpg', 'eewk41jn7krjza.jpg'),
+('test3@foo.com', 'test3', 'password', 'eewk41jn7krtc1.jpg', 'eewk41jn7krtc2.jpg', 'eewk41jn7krtc3.jpg');
 
 INSERT INTO images (id, userid, timestamp, lat, lng)
 VALUES ('eewk41jn7iz5kp.jpg', 'test@foo.com', 1534660022, 1.351658, 103.683273),

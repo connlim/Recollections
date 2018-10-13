@@ -95,7 +95,7 @@ app.get('/',(req, res) => {
 
 app.get('/feed', auth, (req, res) => {
   db.query(`
-    SELECT DISTINCT e.name, e.location, e.date, array_agg(i.id) AS images
+    SELECT DISTINCT e.name, e.location, e.date, array_agg(i.id) AS images, array_agg(u.username) AS other_users
     FROM (
           SELECT DISTINCT e.*
             FROM users_in_event uie, events e
@@ -103,11 +103,12 @@ app.get('/feed', auth, (req, res) => {
                 SELECT DISTINCT userid
                     FROM users_in_clique
                     WHERE clique IN (
-                        SELECT clique FROM users_in_clique WHERE userid=$1
-                    ) AND userid<>$1 ) AND uie.event = e.id
-         ) e, event_clique_image eci, images i
-    WHERE e.id = eci.event AND eci.image = i.id
-    GROUP BY e.name, e.location, e.date;
+                        SELECT clique FROM users_in_clique WHERE userid = $1
+                    ) AND userid <> $1 ) AND uie.event = e.id
+         ) e, event_clique_image eci, images i, users_in_event uie, users u
+    WHERE e.id = eci.event AND eci.image = i.id AND uie.event = e.id AND uie.userid = u.email AND u.email <> $1
+    GROUP BY e.name, e.location, e.date
+    ORDER BY e.date DESC;
     `, [req.user]).then((db_res) => {
       res.status(200).send(db_res.rows);
     }).catch((err) => {
@@ -116,7 +117,7 @@ app.get('/feed', auth, (req, res) => {
 });
 
 app.get('/recollections', (req, res) => {
-  
+  //select * from users_in_clique WHERE userid = 'test@foo.com' ORDER BY random() LIMIT 1000;
 });
 
 app.post('/login', (req, res) => {
