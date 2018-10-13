@@ -116,6 +116,10 @@ app.get('/feed', auth, (req, res) => {
     });
 });
 
+app.get('/recollections', (req, res) => {
+  
+});
+
 app.post('/login', (req, res) => {
   if(!req.body.email){
     res.status(400).send('No email provided');
@@ -186,7 +190,7 @@ app.post('/images', auth, upload.array('file'), (req, res) => {
   if(!req.files) {
     res.status(400).send('No files');
   } else {
-    Promise.all(files.map((file) => {
+    Promise.all(req.files.map((file) => {
       return new Promise((resolve, reject) => {
         //TODO: Check fileType for image/jpeg
         let metadata = {};
@@ -234,6 +238,21 @@ app.post('/images', auth, upload.array('file'), (req, res) => {
 
     });
   }
+});
+
+app.get("/image/:fileid", (req, res) => {
+  mClient.getObject('recollections', req.params.fileid, (err, stream) => {
+    if(err){
+      if(err.code == 'NoSuchKey'){
+        res.status(404).send("No such file");
+      }else{
+        res.status(500).send("Error retrieving file");
+      }
+    }else{
+      res.set("Content-Type", "application/octet-stream");
+      stream.pipe(res);
+    }
+  });
 });
 
 app.listen(process.env.BACKEND_PORT, (err) => {
