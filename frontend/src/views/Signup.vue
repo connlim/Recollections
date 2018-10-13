@@ -28,6 +28,7 @@
 
 <script>
 // @ is an alias to /src
+import axios from 'axios';
 
 export default {
   name: 'Signup',
@@ -36,7 +37,7 @@ export default {
   },
   methods: {
     register: function() {
-
+      axios.post('/signup')
     }
   }
 }
