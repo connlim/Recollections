@@ -63,7 +63,7 @@
           </h6>
           <h6 class="card-subtitle mb-2">
             <font-awesome-icon icon="users"></font-awesome-icon>
-            Person 1, Person 2, Person 3
+            {{ item.other_users | expandArray }}
           </h6>
           <div class="gallery mt-3" id="gallery">
             <!-- Grid column -->
@@ -100,6 +100,9 @@ export default {
   filters: {
     epochToDate: function(epoch) {
       return moment.unix(parseInt(epoch)).format("YYYY-MM-DD");
+    },
+    expandArray: function(arr) {
+      return arr.join(', ');
     }
   },
   created() {
