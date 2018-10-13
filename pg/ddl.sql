@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS images (
   userid TEXT NOT NULL REFERENCES users(email),
   "timestamp" BIGINT,
   lat FLOAT(8),
-  lng FLOAT(8)
+  lng FLOAT(8),
+  uri TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS users_in_image (
@@ -51,3 +52,7 @@ CREATE TABLE IF NOT EXISTS event_clique_image (
   clique INTEGER NOT NULL REFERENCES cliques(id),
   PRIMARY KEY (event, image, clique)
 );
+
+
+INSERT INTO events (id, name, location, date)
+VALUES ()

@@ -19,6 +19,20 @@ const mClient = new minio.Client({
   secretKey : process.env.MINIO_SECRET_KEY
 });
 
+mClient.bucketExists('recollections', (exists) => {
+  if(!exists){ //Create user bucket if it doesn't exist
+    mClient.makeBucket('recollections', 'ap-southeast-1', (make_err) => {
+      if(make_err){
+        console.error(make_err);
+      }else{
+        console.log("Made bucket 'recollections'");
+      }
+    });
+  }else{
+    console.log("Bucket 'recollections' already exists");
+  }
+});
+
 const { Pool } = require('pg');
 const db = new Pool({
   host : process.env.PG_HOST,
@@ -37,35 +51,17 @@ const uniqid = require('uniqid');
 
 const insert_file = (userid, file) => {
   return new Promise((resolve, reject) => {
-    const putFile = () => {
-      const ext = fileType(file).ext;
-      const id = `${uniqid()}.${ext}`;
-      mClient.putObject(userid, id, file, (put_err, etag) => {
-        if(put_err){
-          console.log(put_err);
-          reject({
-            code: 500,
-            message: 'Error storing file'
-          });
-        }else{
-          resolve(id);
-        }
-      });
-    };
-    mClient.bucketExists(userid, (exists) => {
-      if(!exists){ //Create user bucket if it doesn't exist
-        mClient.makeBucket(userid, 'ap-southeast-1', (make_err) => {
-          if(make_err){
-            reject({
-              code: 500,
-              message: 'Error storing file'
-            });
-          }else{
-            putFile();
-          }
+   const ext = fileType(file).ext;
+   const id = `${uniqid()}.${ext}`;
+   mClient.putObject('recollections', id, file, (put_err, etag) => {
+     if(put_err){
+        console.log(put_err);
+        reject({
+          code: 500,
+          message: 'Error storing file'
         });
       }else{
-        putFile();
+        resolve(id);
       }
     });
   });
@@ -95,6 +91,29 @@ app.use(cors());
 
 app.get('/',(req, res) => {
   res.status(200).send('Received at backend service.');
+});
+
+app.get('/feed', auth, (req, res) => {
+  db.query(
+    ```
+    SELECT DISTINCT e.name, e.location, e.date, array_agg(i.uri) AS images 
+    FROM (
+          SELECT DISTINCT event 
+            FROM users_in_event 
+            WHERE userid IN (
+                SELECT DISTINCT userid 
+                    FROM users_in_clique 
+                    WHERE clique IN (
+                        SELECT clique FROM users_in_clique WHERE userid=$1
+                    ) AND userid<>$1 )
+         ) e, event_clique_image eci, images i 
+    WHERE e.id = eci.event AND eci.image = i.id 
+    GROUP BY e.name, e.location, e.date;
+    ```, [req.user]).then((db_res) => {
+      res.status(200).send(db_res.rows);
+    }).catch((err) => {
+      res.status(500).send(err);
+    });
 });
 
 app.post('/login', (req, res) => {
@@ -138,7 +157,7 @@ app.post('/signup', upload.single('profile_pic'), (req, res) => {
         return insert_file(req.body.email, req.file.buffer);
       }
     }).then((profile_id) => {
-      return db.query('INSERT INTO users (email, username, password, profile_pic) VALUES ($1, $2, $3, $4)', [
+      return db.query('INSERT INTO users (email, username, password, profile_pic_1) VALUES ($1, $2, $3, $4)', [
         req.body.email,
         req.body.username,
         req.body.password,
@@ -147,7 +166,8 @@ app.post('/signup', upload.single('profile_pic'), (req, res) => {
     }).then(() => {
       res.status(200).send('Success');
     }).catch((err) => {
-      if(err.code && err.message) {
+      console.log(err);
+      if(err.code && err.message && !err.severity) {
         res.status(err.code).send(err.message);
       } else {
         res.status(500).send("Database error");
@@ -185,7 +205,6 @@ app.post('/images', auth, upload.array('file'), (req, res) => {
         }).catch((err) => reject(err));
       });
     })).then((files_data) => {
-      let groups = []; //Group on time
       files_data = files_data.sort((a, b) => a.datetime - b.datetime); //Sort images on date and time
       let differences = [];
       for(let i = 0; i < files_data.length-1; i++){
