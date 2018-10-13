@@ -96,16 +96,16 @@ app.get('/',(req, res) => {
 app.get('/feed', auth, (req, res) => {
   db.query(
     ```
-    SELECT DISTINCT e.name, e.location, e.date, array_agg(i.uri) AS images
+    SELECT DISTINCT e.name, e.location, e.date, array_agg(i.id) AS images
     FROM (
-          SELECT DISTINCT event
-            FROM users_in_event
+          SELECT DISTINCT e.*
+            FROM users_in_event uie, events e
             WHERE userid IN (
                 SELECT DISTINCT userid
                     FROM users_in_clique
                     WHERE clique IN (
-                        SELECT clique FROM users_in_clique WHERE userid=$1
-                    ) AND userid<>$1 )
+                        SELECT clique FROM users_in_clique WHERE userid='test@foo.com'
+                    ) AND userid<>'test@foo.com' ) AND uie.event = e.id
          ) e, event_clique_image eci, images i
     WHERE e.id = eci.event AND eci.image = i.id
     GROUP BY e.name, e.location, e.date;
