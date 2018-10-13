@@ -91,6 +91,7 @@ const auth = (req, res, next) => {
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+app.use(cors());
 
 app.get('/', auth, (req, res) => {
   res.status(200).send('Received at backend service.');
@@ -155,27 +156,59 @@ app.post('/signup', upload.single('profile_pic'), (req, res) => {
   }
 });
 
-app.post('/images', upload.array('file'), (req, res) => {
-  // if(!req.files) {
-  //   res.status(400).send('No files');
-  // } else {
-  //   for(file in files) {
-  //
-  //   }
-  // }
-  // else if(fileType(req.file.buffer) !== 'image/jpeg') {
-  //   res.status(400).send('Incorrect file type');
-  // } else {
-  //   let metadata = {};
-  //   try {
-  //     const parser = exifParser.create(req.file.buffer);
-  //     const results = parser.parse();
-  //     metadata.lat = results.tags.GPSLatitude;
-  //     metadata.lng = results.tags.GPSLongitude;
-  //     metadata.datetime = results.tags.DateTimeOriginal;
-  //   } catch(e) {}
-  //   res.status(200).send(metadata);
-  // }
+app.post('/images', auth, upload.array('file'), (req, res) => {
+  if(!req.files) {
+    res.status(400).send('No files');
+  } else {
+    Promise.all(files.map((file) => {
+      return new Promise((resolve, reject) => {
+        //TODO: Check fileType for image/jpeg
+        let metadata = {};
+        try {
+          const parser = exifParser.create(file.buffer);
+          const results = parser.parse();
+          metadata.lat = results.tags.GPSLatitude;
+          metadata.lng = results.tags.GPSLongitude;
+          metadata.datetime = results.tags.DateTimeOriginal;
+        } catch(e) {}
+        insert_file(req.user, file.buffer).then((id) => { // Insert file into minio
+          //Insert entry into postgres
+          return db.query('INSERT INTO images (id, userid, timestamp, lat, lng) VALUES ($1, $2, $3, $4, $5)', [
+            id,
+            req.user,
+            metadata.datetime,
+            metadata.lat,
+            metadata.lng
+          ]);
+        }).then(() => {
+          resolve({ id, ...metadata, buffer: file.buffer });
+        }).catch((err) => reject(err));
+      });
+    })).then((files_data) => {
+      let groups = []; //Group on time
+      files_data = files_data.sort((a, b) => a.datetime - b.datetime); //Sort images on date and time
+      let differences = [];
+      for(let i = 0; i < files_data.length-1; i++){
+        differences.push(files_data[i+1].datetime - files_data[i].datetime);
+      }
+      const difference_sum = differences.reduce((acc, val) => acc + val, 0);
+      const difference_mean = difference_sum / differences.length;
+      const difference_sd = Math.sqrt(differences.reduce((acc, val) => acc + Math.pow(val - difference_mean, 2), 0.0) / (differences.length - 1));
+      let groups = [[files_data[0]]];
+      let current_group = 0;
+      for(let i = 0; i < differences.length; i++){
+        if(differences[i] < 3 * difference_sd) { //3 standard deviations threshold
+          groups[current_group].push(files_data[i+1]);
+        }else{ //If difference is an outlier
+          current_group++;
+          groups.push([files_data[i+1]]); //Push into new array entry
+        }
+      }
+      return groups;
+    }).then((groups) => {
+
+    });
+  }
 });
 
 app.listen(process.env.BACKEND_PORT, (err) => {
