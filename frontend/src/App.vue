@@ -18,7 +18,7 @@ export default {
     if(localStorage.getItem('token')){
 
     }else{
-
+      this.$router.push('/signin');
     }
   },
 }

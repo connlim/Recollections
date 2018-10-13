@@ -20,6 +20,7 @@
 
 <script>
 // @ is an alias to /src
+import axios from 'axios';
 
 export default {
   name: 'Signin',
@@ -31,9 +32,9 @@ export default {
       axios.post(`${process.env.VUE_APP_BACKEND_URL}/login`, {
         email: document.getElementById('exampleInputEmail1').value,
         password: document.getElementById('exampleInputPassword1').value,
-      }).then((token) => {
-        localStorage.setItem('token', token);
-        //TODO: redirect
+      }).then((res) => {
+        localStorage.setItem('token', res.data);
+        this.$router.push('/');
       }).catch((err) => {
         console.log(err);
       });
