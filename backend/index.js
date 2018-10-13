@@ -129,7 +129,7 @@ app.get('/feed', auth, (req, res) => {
                         SELECT clique FROM users_in_clique WHERE userid = $1
                     ) AND userid <> $1 ) AND uie.event = e.id
          ) e, event_clique_image eci, images i, users_in_event uie, users u
-    WHERE e.id = eci.event AND eci.image = i.id AND uie.event = e.id AND uie.userid = u.email AND u.email <> $1
+    WHERE e.id = eci.event AND eci.image = i.id AND uie.event = e.id AND uie.userid = u.email
     GROUP BY e.name, e.location, e.date
     ORDER BY e.date DESC;
     `, [req.user]).then((db_res) => {
@@ -139,8 +139,23 @@ app.get('/feed', auth, (req, res) => {
     });
 });
 
-app.get('/recollections', (req, res) => {
+app.get('/recollections', auth, (req, res) => {
   //select * from users_in_clique WHERE userid = 'test@foo.com' ORDER BY random() LIMIT 1000;
+  db.query(`
+    SELECT e.name, e.location, e.date, array_agg(DISTINCT i.id) AS images, array_agg(DISTINCT u.username) AS other_users
+    FROM (
+          SELECT events.* FROM events 
+          INNER JOIN users_in_event ON events.id = users_in_event.event
+          WHERE users_in_event.userid = $1
+         ) e, event_clique_image eci, images i, users_in_event uie, users u
+    WHERE e.id = eci.event AND eci.image = i.id AND uie.event = e.id AND uie.userid = u.email
+    GROUP BY e.name, e.location, e.date
+    ORDER BY random() LIMIT 1000;
+    `, [req.user]).then((db_res) => {
+      res.status(200).send(db_res.rows);
+    }).catch((err) => {
+      res.status(500).send(err);
+    });
 });
 
 app.post('/login', (req, res) => {
@@ -276,6 +291,16 @@ app.get("/image/:fileid", (req, res) => {
       stream.pipe(res);
     }
   });
+});
+
+app.get("/profile", auth, (req, res) => {
+  db.query(`
+
+    `, [req.user]).then((db_res) => {
+      res.status(200).send(db_res.rows);
+    }).catch((err) => {
+      res.status(500).send(err);
+    });
 });
 
 app.listen(process.env.BACKEND_PORT, (err) => {

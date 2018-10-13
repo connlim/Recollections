@@ -5,51 +5,6 @@
       <router-link to="/recollections">Recollections</router-link>
     </div>
 
-    <div class="row justify-content-center mb-3">
-      <div class="card col-lg-7">
-        <div class="card-body">
-          <div class="d-flex">
-            <h5 class="card-title mb-3 mr-auto">Event Name</h5>
-            <p>abcd</p>
-          </div>
-          <h6 class="card-subtitle mb-2">
-            <font-awesome-icon icon="map-marker-alt"></font-awesome-icon>
-            Location
-          </h6>
-          <h6 class="card-subtitle mb-2">
-            <font-awesome-icon icon="users"></font-awesome-icon>
-            Person 1, Person 2, Person 3
-          </h6>
-          <div class="gallery mt-3" id="gallery">
-            <!-- Grid column -->
-            <div class="mb-3">
-              <img class="img-fluid" src="../../../test.jpg" alt="Card image cap">
-            </div>
-            <div class="mb-3">
-              <img class="img-fluid" src="../assets/logo.png" alt="Card image cap">
-            </div>
-            <div class="mb-3">
-              <img class="img-fluid" src="https://mdbootstrap.com/img/Photos/Vertical/mountain2.jpg" alt="Card image cap">
-            </div>
-            <div class="mb-3">
-              <img class="img-fluid" src="https://mdbootstrap.com/img/Photos/Horizontal/Nature/4-col/img%20(35).jpg" alt="Card image cap">
-            </div>
-            <div class="mb-3">
-              <img class="img-fluid" src="https://mdbootstrap.com/img/Photos/Horizontal/Nature/4-col/img%20(18).jpg" alt="Card image cap">
-            </div>
-            <div class="mb-3">
-              <img class="img-fluid" src="https://mdbootstrap.com/img/Photos/Vertical/mountain3.jpg" alt="Card image cap">
-            </div>
-          </div>
-          <div class="row">
-            <button type="button" class="btn btn-link">Like</button>
-            <span style="line-height: 40px">|</span>
-            <button type="button" class="btn btn-link">Comment</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <div v-for="item in feed" class="row justify-content-center mb-3">
       <div class="card col-lg-7">
         <div class="card-body">
