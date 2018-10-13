@@ -28,8 +28,11 @@ const db = new Pool({
   password : process.env.PG_PASSWORD
 });
 
+const bearerToken = require('bearer-token');
+const crypto = require('crypto');
 const exifParser = require('exif-parser');
 const fileType = require('file-type');
+const jwt = require('jsonwebtoken');
 const uniqid = require('uniqid');
 
 const insert_file = (userid, file) => {
@@ -68,12 +71,51 @@ const insert_file = (userid, file) => {
   });
 };
 
+const auth = (req, res, next) => {
+  bearerToken(req, (tok_err, token) => { //Get Bearer token from headers
+    if(token){
+      jwt.verify(token, process.env.SECRET, (ver_err, decoded) => {
+        if(ver_err){
+          res.status(403).send('Invalid token');
+        }else{
+          req.user = decoded.email;
+          next();
+        }
+      })
+    }else{
+      res.status(403).send('Token required');
+    }
+  });
+};
+
 const app = express();
-app.use(bodyParser.urlencoded({ extended:true }));
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-app.get('/', (req, res) => {
+app.get('/', auth, (req, res) => {
   res.status(200).send('Received at backend service.');
+});
+
+app.post('/login', (req, res) => {
+  if(!req.body.email){
+    res.status(400).send('No email provided');
+  }else if(!req.body.password){
+    res.status(400).send('No password provided');
+  }else{
+    db.query('SELECT password FROM users WHERE email = $1', [
+      req.body.email
+    ]).then((db_res) => {
+      if(db_res.rows[0] && db_res.rows[0].password === req.body.password) {
+        res.status(200).send(jwt.sign({
+          email: req.body.email
+        }, process.env.SECRET));
+      }else{
+        res.status(403).send('Invalid credentials');
+      }
+    }).catch(() => {
+      res.status(500).send('Database error');
+    });
+  }
 });
 
 app.post('/signup', upload.single('profile_pic'), (req, res) => {

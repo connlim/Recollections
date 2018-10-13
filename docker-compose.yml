@@ -26,6 +26,7 @@ services:
     build: ./backend
     environment:
       - BACKEND_PORT=10200
+      - SECRET=SECRET
       - MAX_SIZE=2000000000 #2GB
       - PG_HOST=pg
       - PG_PORT=5432
