@@ -52,7 +52,7 @@
 </template>
 
 <script>
-// @ is an alias to /src
+import axios from 'axios';
 
 export default {
   name: 'Feed',
@@ -60,9 +60,19 @@ export default {
     
   },
   methods: {
-    like: function() {
-
-    }
+    
+  },
+  created() {
+    axios.get(`${process.env.VUE_APP_BACKEND_URL}/feed`, {
+      headers: {
+        Authorization:  `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+      .then((res) => {
+        console.log(res.data);
+      }).catch((err) => {
+        console.log(err);
+      });
   }
 }
 </script>
