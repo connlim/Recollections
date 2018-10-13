@@ -158,6 +158,16 @@ app.get('/recollections', auth, (req, res) => {
     });
 });
 
+app.get('/profile', auth, (req, res) => {
+  //select * from users_in_clique WHERE userid = 'test@foo.com' ORDER BY random() LIMIT 1000;
+  db.query("SELECT id FROM images WHERE userid=$1", [req.user]
+    ).then((db_res) => {
+      res.status(200).send(db_res.rows);
+    }).catch((err) => {
+      res.status(500).send(err);
+    });
+});
+
 app.post('/login', (req, res) => {
   if(!req.body.email){
     res.status(400).send('No email provided');

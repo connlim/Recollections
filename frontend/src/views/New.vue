@@ -75,7 +75,7 @@ export default {
 }
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .gallery {
   -webkit-column-count: 3;
   -moz-column-count: 3;
