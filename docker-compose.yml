@@ -1,0 +1,46 @@
+version: "3"
+services:
+  pg:
+    build: ./pg
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - defaultnet
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000" #Open temporarily for debugging
+    networks:
+      - defaultnet
+    environment:
+      - MINIO_ACCESS_KEY=ACCESS_KEY
+      - MINIO_SECRET_KEY=SECRET_KEY
+    volumes:
+      - ./minio:/export
+    command: minio server /export
+  backend:
+    build: ./backend
+    environment:
+      - BACKEND_PORT=10200
+      - MAX_SIZE=2000000000 #2GB
+      - PG_HOST=pg
+      - PG_PORT=5432
+      - PG_USER=user
+      - PG_PASSWORD=password
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=ACCESS_KEY
+      - MINIO_SECRET_KEY=SECRET_KEY
+    ports:
+      - "10200:10200"
+    depends_on:
+      - pg
+      - minio
+    networks:
+      - defaultnet
+networks:
+  defaultnet:
