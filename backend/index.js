@@ -30,10 +30,13 @@ const geocoder = NodeGeocoder(options);
 
 const reverseGeocode = (lat, lng) => {
   geocoder.reverse({lat: lat, lon: lng}, function(err, res) {
+    console.log('=============================================================================================');
     console.log(res);
-    return res;
+    return res.premise || res.neighborhood;
   });
 }
+
+// reverseGeocode(1.341024, 103.665972);
 
 mClient.bucketExists('recollections', (exists) => {
   if(!exists){ //Create user bucket if it doesn't exist
@@ -111,7 +114,7 @@ app.get('/',(req, res) => {
 
 app.get('/feed', auth, (req, res) => {
   db.query(`
-    SELECT DISTINCT e.name, e.location, e.date, array_agg(i.id) AS images, array_agg(u.username) AS other_users
+    SELECT DISTINCT e.name, e.location, e.date, array_agg(DISTINCT i.id) AS images, array_agg(DISTINCT u.username) AS other_users
     FROM (
           SELECT DISTINCT e.*
             FROM users_in_event uie, events e
