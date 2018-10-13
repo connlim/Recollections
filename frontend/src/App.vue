@@ -12,7 +12,15 @@ export default {
   name: 'App',
   components: {
     Navbar
-  }
+  },
+  mounted(){
+    console.log(process.env.VUE_APP_BACKEND_URL);
+    if(localStorage.getItem('token')){
+
+    }else{
+
+    }
+  },
 }
 </script>
 
