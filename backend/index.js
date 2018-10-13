@@ -19,6 +19,22 @@ const mClient = new minio.Client({
   secretKey : process.env.MINIO_SECRET_KEY
 });
 
+const NodeGeocoder = require('node-geocoder');
+const options = {
+  provider: 'google',
+  httpAdapter: 'https', // Default
+  apiKey: 'AIzaSyCYeybduSuf8lNaqC_OSc-VFxlaDSltYuo', // for Mapquest, OpenCage, Google Premier
+  formatter: null         // 'gpx', 'string', ...
+};
+const geocoder = NodeGeocoder(options);
+
+const reverseGeocode = (lat, lng) => {
+  geocoder.reverse({lat: lat, lon: lng}, function(err, res) {
+    console.log(res);
+    return res;
+  });
+}
+
 mClient.bucketExists('recollections', (exists) => {
   if(!exists){ //Create user bucket if it doesn't exist
     mClient.makeBucket('recollections', 'ap-southeast-1', (make_err) => {
