@@ -1,6 +1,9 @@
 <template>
-  <div class="home">
-    
+  <div class="container">
+    <div id="nav">
+      <router-link to="/">Feed</router-link> |
+      <router-link to="/recollections">Recollections</router-link>
+    </div>
   </div>
 </template>
 
