@@ -87,6 +87,9 @@ const insert_file = (userid, file) => {
 };
 
 const auth = (req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    next();
+  }
   bearerToken(req, (tok_err, token) => { //Get Bearer token from headers
     if(token){
       jwt.verify(token, process.env.SECRET, (ver_err, decoded) => {
@@ -104,9 +107,10 @@ const auth = (req, res, next) => {
 };
 
 const app = express();
+app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-app.use(cors());
+
 
 app.get('/',(req, res) => {
   res.status(200).send('Received at backend service.');
