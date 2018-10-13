@@ -10,7 +10,7 @@
                 <!-- <router-link to="/" class="nav-item nav-link clickable">Feed</router-link>
                 <router-link to="/recollections" class="nav-item nav-link clickable">Recollections</router-link> -->
             </div>
-            <div class="navbar-nav">
+            <div v-if="isLoggedIn" class="navbar-nav">
                 <router-link to="/cliques" class="nav-item nav-link clickable">Cliques</router-link>
                 <router-link to="/profile" class="nav-item nav-link clickable">Profile</router-link>
                 <router-link to="/new" class="nav-item nav-link clickable">New</router-link>
@@ -25,10 +25,14 @@
 <script>
 export default {
     name: "Navbar",
-    methods:
-    {
+    methods: {
 		signout: function(){
 			console.log('signout');
+        }
+    },
+    computed: {
+        isLoggedIn: function() {
+            return ['sign in', 'sign up'].indexOf(this.$route.name) == -1;
         }
     }
 }
