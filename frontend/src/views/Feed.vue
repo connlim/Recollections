@@ -5,37 +5,25 @@
       <router-link to="/recollections">Recollections</router-link>
     </div>
 
-    <div class="row justify-content-center mb-3">
-      <div class="card col-lg-8">
+    <div v-for="item in feed" class="row justify-content-center mb-3">
+      <div class="card col-lg-7">
         <div class="card-body">
-          <h5 class="card-title mb-3">Event Name</h5>
+          <div class="d-flex">
+            <h5 class="card-title mb-3 mr-auto">{{ item.name }}</h5>
+            <p>{{ item.date | epochToDate }}</p>
+          </div>
           <h6 class="card-subtitle mb-2">
             <font-awesome-icon icon="map-marker-alt"></font-awesome-icon>
-            Location
+            {{ item.location }}
           </h6>
           <h6 class="card-subtitle mb-2">
             <font-awesome-icon icon="users"></font-awesome-icon>
-            Person 1, Person 2, Person 3
+            {{ item.other_users | expandArray }}
           </h6>
           <div class="gallery mt-3" id="gallery">
             <!-- Grid column -->
-            <div class="mb-3">
-              <img class="img-fluid" src="../../../test.jpg" alt="Card image cap">
-            </div>
-            <div class="mb-3">
-              <img class="img-fluid" src="../assets/logo.png" alt="Card image cap">
-            </div>
-            <div class="mb-3">
-              <img class="img-fluid" src="https://mdbootstrap.com/img/Photos/Vertical/mountain2.jpg" alt="Card image cap">
-            </div>
-            <div class="mb-3">
-              <img class="img-fluid" src="https://mdbootstrap.com/img/Photos/Horizontal/Nature/4-col/img%20(35).jpg" alt="Card image cap">
-            </div>
-            <div class="mb-3">
-              <img class="img-fluid" src="https://mdbootstrap.com/img/Photos/Horizontal/Nature/4-col/img%20(18).jpg" alt="Card image cap">
-            </div>
-            <div class="mb-3">
-              <img class="img-fluid" src="https://mdbootstrap.com/img/Photos/Vertical/mountain3.jpg" alt="Card image cap">
+            <div v-for="imageID in item.images" class="mb-3">
+              <img class="img-fluid" :src="getImageSource(imageID)" alt="Card image cap">
             </div>
           </div>
           <div class="row">
@@ -46,13 +34,13 @@
         </div>
       </div>
     </div>
-
     
   </div>
 </template>
 
 <script>
 import axios from 'axios';
+import moment from 'moment';
 
 export default {
   name: 'Feed',
@@ -60,31 +48,49 @@ export default {
     
   },
   methods: {
-    
+    getImageSource: function(imageID) {
+      return `${process.env.VUE_APP_BACKEND_URL}/image/` + imageID;
+    }
+  },
+  filters: {
+    epochToDate: function(epoch) {
+      return moment.unix(parseInt(epoch)).format("YYYY-MM-DD");
+    },
+    expandArray: function(arr) {
+      return arr.join(', ');
+    }
   },
   created() {
+    let that = this;
     axios.get(`${process.env.VUE_APP_BACKEND_URL}/feed`, {
       headers: {
         Authorization:  `Bearer ${localStorage.getItem('token')}`
       }
-    })
-      .then((res) => {
-        console.log(res.data);
-      }).catch((err) => {
-        console.log(err);
-      });
+    }).then((res) => {
+      console.log(res.data);
+      that.feed = res.data;
+    }).catch((err) => {
+      console.log(err);
+    });
+
+
+  },
+  data() {
+    return {
+      feed: []
+    }
   }
 }
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .gallery {
-  -webkit-column-count: 3;
-  -moz-column-count: 3;
-  column-count: 3;
-  -webkit-column-width: 33%;
-  -moz-column-width: 33%;
-  column-width: 33%; 
+  -webkit-column-count: 2;
+  -moz-column-count: 2;
+  column-count: 2;
+  -webkit-column-width: 50%;
+  -moz-column-width: 50%;
+  column-width: 50%; 
 }
 
 @media (max-width: 450px) {

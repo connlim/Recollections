@@ -17,7 +17,7 @@
           </div>
           <div class="custom-file mt-2">
             <input name="profile_pic" type="file" accept=".jpg" class="custom-file-input" id="profilePicUpload" aria-describedby="inputGroupFileAddon01" multiple>
-            <label class="custom-file-label" for="profilePicUpload">Choose profile picture</label>
+            <label class="custom-file-label" for="profilePicUpload">Select 3 good pictures of yourself</label>
           </div>
           <button type="submit" class="btn btn-primary mt-3">Register</button>
         </form>

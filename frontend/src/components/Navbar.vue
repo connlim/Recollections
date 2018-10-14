@@ -13,7 +13,7 @@
             <div v-if="isLoggedIn" class="navbar-nav">
                 <router-link to="/cliques" class="nav-item nav-link clickable">Cliques</router-link>
                 <router-link to="/profile" class="nav-item nav-link clickable">Profile</router-link>
-                <router-link to="/new" class="nav-item nav-link clickable">New</router-link>
+                <router-link to="/new" class="nav-item nav-link clickable">Upload</router-link>
                 <button type="button" class="ml-3 btn btn-default btn-sm" onclick="signout()">
                     Sign out
                 </button>

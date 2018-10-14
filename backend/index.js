@@ -19,6 +19,25 @@ const mClient = new minio.Client({
   secretKey : process.env.MINIO_SECRET_KEY
 });
 
+const NodeGeocoder = require('node-geocoder');
+const options = {
+  provider: 'google',
+  httpAdapter: 'https', // Default
+  apiKey: 'AIzaSyCYeybduSuf8lNaqC_OSc-VFxlaDSltYuo', // for Mapquest, OpenCage, Google Premier
+  formatter: null         // 'gpx', 'string', ...
+};
+const geocoder = NodeGeocoder(options);
+
+const reverseGeocode = (lat, lng) => {
+  geocoder.reverse({lat: lat, lon: lng}, function(err, res) {
+    console.log('=============================================================================================');
+    console.log(res);
+    return res.premise || res.neighborhood;
+  });
+}
+
+// reverseGeocode(1.341024, 103.665972);
+
 mClient.bucketExists('recollections', (exists) => {
   if(!exists){ //Create user bucket if it doesn't exist
     mClient.makeBucket('recollections', 'ap-southeast-1', (make_err) => {
@@ -71,6 +90,9 @@ const insert_file = (file) => {
 };
 
 const auth = (req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    next();
+  }
   bearerToken(req, (tok_err, token) => { //Get Bearer token from headers
     if(token){
       jwt.verify(token, process.env.SECRET, (ver_err, decoded) => {
@@ -88,9 +110,10 @@ const auth = (req, res, next) => {
 };
 
 const app = express();
+app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-app.use(cors());
+
 
 app.get('/',(req, res) => {
   res.status(200).send('Received at backend service.');
@@ -98,7 +121,7 @@ app.get('/',(req, res) => {
 
 app.get('/feed', auth, (req, res) => {
   db.query(`
-    SELECT DISTINCT e.name, e.location, e.date, array_agg(i.id) AS images, array_agg(u.username) AS other_users
+    SELECT DISTINCT e.name, e.location, e.date, array_agg(DISTINCT i.id) AS images, array_agg(DISTINCT u.username) AS other_users
     FROM (
           SELECT DISTINCT e.*
             FROM users_in_event uie, events e
@@ -109,7 +132,7 @@ app.get('/feed', auth, (req, res) => {
                         SELECT clique FROM users_in_clique WHERE userid = $1
                     ) AND userid <> $1 ) AND uie.event = e.id
          ) e, event_clique_image eci, images i, users_in_event uie, users u
-    WHERE e.id = eci.event AND eci.image = i.id AND uie.event = e.id AND uie.userid = u.email AND u.email <> $1
+    WHERE e.id = eci.event AND eci.image = i.id AND uie.event = e.id AND uie.userid = u.email
     GROUP BY e.name, e.location, e.date
     ORDER BY e.date DESC;
     `, [req.user]).then((db_res) => {
@@ -119,8 +142,33 @@ app.get('/feed', auth, (req, res) => {
     });
 });
 
-app.get('/recollections', (req, res) => {
+app.get('/recollections', auth, (req, res) => {
   //select * from users_in_clique WHERE userid = 'test@foo.com' ORDER BY random() LIMIT 1000;
+  db.query(`
+    SELECT e.name, e.location, e.date, array_agg(DISTINCT i.id) AS images, array_agg(DISTINCT u.username) AS other_users
+    FROM (
+          SELECT events.* FROM events 
+          INNER JOIN users_in_event ON events.id = users_in_event.event
+          WHERE users_in_event.userid = $1
+         ) e, event_clique_image eci, images i, users_in_event uie, users u
+    WHERE e.id = eci.event AND eci.image = i.id AND uie.event = e.id AND uie.userid = u.email
+    GROUP BY e.name, e.location, e.date
+    ORDER BY random() LIMIT 1000;
+    `, [req.user]).then((db_res) => {
+      res.status(200).send(db_res.rows);
+    }).catch((err) => {
+      res.status(500).send(err);
+    });
+});
+
+app.get('/profile', auth, (req, res) => {
+  //select * from users_in_clique WHERE userid = 'test@foo.com' ORDER BY random() LIMIT 1000;
+  db.query("SELECT id FROM images WHERE userid=$1", [req.user]
+    ).then((db_res) => {
+      res.status(200).send(db_res.rows);
+    }).catch((err) => {
+      res.status(500).send(err);
+    });
 });
 
 app.post('/login', (req, res) => {
@@ -377,6 +425,16 @@ app.get("/image/:fileid", (req, res) => {
       stream.pipe(res);
     }
   });
+});
+
+app.get("/profile", auth, (req, res) => {
+  db.query(`
+
+    `, [req.user]).then((db_res) => {
+      res.status(200).send(db_res.rows);
+    }).catch((err) => {
+      res.status(500).send(err);
+    });
 });
 
 app.listen(process.env.BACKEND_PORT, (err) => {

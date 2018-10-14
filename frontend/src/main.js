@@ -5,6 +5,9 @@ import { library } from '@fortawesome/fontawesome-svg-core'
 import { faMapMarkerAlt, faUsers } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
+window.$ = require('jquery')
+window.JQuery = require('jquery')
+
 library.add(faMapMarkerAlt, faUsers)
 
 Vue.component('font-awesome-icon', FontAwesomeIcon)
