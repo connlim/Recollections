@@ -53,57 +53,44 @@ CREATE TABLE IF NOT EXISTS event_clique_image (
 );
 
 INSERT INTO users (email, username, password, profile_pic_1, profile_pic_2, profile_pic_3)
-VALUES ('test@foo.com', 'test', 'password', 'eewk41jn7jrjmq.jpg', 'eewk41jn7jrjmr.jpg', 'eewk41jn7jrjms.jpg'),
-('test1@foo.com', 'test1', 'password', 'eewk41jn7ko0iz.jpg', 'eewk41jn7ko0j0.jpg', 'eewk41jn7ko0j1.jpg'),
-('test2@foo.com', 'test2', 'password', 'eewk41jn7krjz8.jpg', 'eewk41jn7krjz9.jpg', 'eewk41jn7krjza.jpg'),
-('test3@foo.com', 'test3', 'password', 'eewk41jn7krtc1.jpg', 'eewk41jn7krtc2.jpg', 'eewk41jn7krtc3.jpg');
+VALUES ('jacob.teo@gmail.com', 'jacobteo', 'password', 'eewk41jn7jrjmq.jpg', 'eewk41jn7jrjmr.jpg', 'eewk41jn7jrjms.jpg'),
+('dylantoh@gmail.com', 'dylanabcd', 'password', 'eewk41jn7ko0iz.jpg', 'eewk41jn7ko0j0.jpg', 'eewk41jn7ko0j1.jpg'),
+('clemenclemenclemen@gmail.com', 'clemeeeeen', 'password', 'eewk41jn7krjz8.jpg', 'eewk41jn7krjz9.jpg', 'eewk41jn7krjza.jpg');
 
 INSERT INTO images (id, userid, timestamp, lat, lng)
-VALUES ('eewk41jn7iz5kp.jpg', 'test@foo.com', 1534660022, 1.351658, 103.683273),
-('eewk41jn7jrjmq.jpg', 'test@foo.com', 1534660100, 1.351758, 103.684273),
-('eewk41jn7krjza.jpg', 'test@foo.com', 1534550100, 1.351858, 103.694273),
-('eewk41jn7krtc1.jpg', 'test@foo.com', 1534440100, 1.351958, 103.644273),
-('eewk41jn7jrjms.jpg', 'test@foo.com', 1534660000, 1.351858, 103.685273),
-('eewk41jn7krtc2.jpg', 'test@foo.com', 1534660000, 1.351858, 103.685273),
-('eewk41jn7krtc3.jpg', 'test@foo.com', 1534660000, 1.351858, 103.685273);
+VALUES ('eewk41jn7iz5kp.jpg', 'jacob.teo@gmail.com', 1534660022, 1.351658, 103.683273),
+('eewk41jn7jrjmq.jpg', 'jacob.teo@gmail.com', 1534660100, 1.351758, 103.684273),
+('eewk41jn7krjza.jpg', 'jacob.teo@gmail.com', 1534550100, 1.351858, 103.694273),
+('eewk41jn7krtc1.jpg', 'dylantoh@gmail.com', 1534440100, 1.351958, 103.644273),
+('eewk41jn7jrjms.jpg', 'dylantoh@gmail.com', 1534660000, 1.351858, 103.685273),
+('eewk41jn7krtc2.jpg', 'dylantoh@gmail.com', 1534660000, 1.351858, 103.685273),
+('eewk41jn7krtc3.jpg', 'dylantoh@gmail.com', 1534660000, 1.351858, 103.685273);
 
 INSERT INTO events (name, location, date)
-VALUES ('SDYC', 'NUS High School', 1534660022),
-('iNTUition', 'NTU', 1539960022),
-('Thingy', 'Piggy', 1546660022);
+VALUES ('iNTUition', 'Nanyang Technological University', 1539470730),
+('SDYC', 'NUS High School of Math and Science', 1534682730);
 
 INSERT INTO users_in_event (event, userid)
-VALUES (1, 'test@foo.com'),
-(1, 'test1@foo.com'),
-(1, 'test2@foo.com'),
-(1, 'test3@foo.com'),
-(2, 'test@foo.com'),
-(2, 'test2@foo.com'),
-(2, 'test3@foo.com'),
-(3, 'test@foo.com'),
-(3, 'test1@foo.com'),
-(3, 'test2@foo.com');
+VALUES (1, 'jacob.teo@gmail.com'),
+(1, 'dylantoh@gmail.com'),
+(1, 'clemenclemenclemen@gmail.com');
 
 INSERT INTO cliques (name)
-VALUES ('Clique 1'),
-('Clique 2'),
-('Clique 3');
+VALUES ('Jacob Gang'),
+('ABCde'),
+('my group');
 
 INSERT INTO users_in_clique (userid, clique)
-VALUES ('test@foo.com', 1),
-('test1@foo.com', 1),
-('test2@foo.com', 1),
-('test1@foo.com', 2),
-('test2@foo.com', 2),
-('test3@foo.com', 2),
-('test@foo.com', 3),
-('test3@foo.com', 3);
+VALUES ('jacob.teo@gmail.com', 1),
+('dylantoh@gmail.com', 1),
+('clemenclemenclemen@gmail.com', 1);
 
 INSERT INTO event_clique_image (event, image, clique)
 VALUES (1, 'eewk41jn7iz5kp.jpg', 1),
 (1, 'eewk41jn7jrjmq.jpg', 1),
 (1, 'eewk41jn7krjza.jpg', 1),
-(2, 'eewk41jn7krtc1.jpg', 2),
-(2, 'eewk41jn7jrjms.jpg', 3),
-(3, 'eewk41jn7krtc2.jpg', 3),
-(3, 'eewk41jn7krtc3.jpg', 3);
+(1, 'eewk41jn7krtc1.jpg', 1),
+(1, 'eewk41jn7jrjms.jpg', 1),
+(1, 'eewk41jn7krtc2.jpg', 1);
+
+insert into users_in_clique values ('jacob.teo@gmail.com', 2), ('jacob.teo@gmail.com', 3)

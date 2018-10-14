@@ -1,6 +1,9 @@
 <template>
   <div class="container">
-    <div id="nav" style="text-align: center">
+    <div class="row justify-content-center mt-5 mb-1">
+      <h5><b>My Cliques</b></h5>
+    </div>
+    <div class="pt-0" id="nav" style="text-align: center">
       |
       <span v-for="clique in cliques" :key="clique.id">
         <a :class="{'small-nav-active': clique.id == activeClique.id}" @click="showData(clique)" href="#">{{ clique.name }}</a> | 
