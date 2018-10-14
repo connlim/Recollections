@@ -428,14 +428,60 @@ app.get("/image/:fileid", (req, res) => {
   });
 });
 
-app.get("/profile", auth, (req, res) => {
-  db.query(`
+app.post("/clique", auth, (req, res) => {
+  db.query("INSERT INTO cliques (name) VALUES ($1) RETURNING id;", [req.body.clique_name])
+  .then((db_res) => {
+    let clique = db_res.rows[0].id;
+    console.log(clique);
+    let users = req.body.users;
+    users.push(req.user);
+    let clique_values = users.map(u => '( \'' + u + `\', ${clique})`).join(',');
+    console.log(clique_values);
+    return db.query(`INSERT INTO users_in_clique (userid, clique) VALUES ${clique_values}`);
+  }).then((db_res) => {
+    console.log(db_res);
+    res.status(200).send('Success');
+  }).catch((err) => {
+    res.status(500).send(err);
+  });
+});
 
-    `, [req.user]).then((db_res) => {
-      res.status(200).send(db_res.rows);
-    }).catch((err) => {
-      res.status(500).send(err);
-    });
+app.get("/clique", auth, (req, res) => {
+  db.query(`
+    SELECT cliques.id, cliques.name FROM cliques
+    INNER JOIN users_in_clique on cliques.id = users_in_clique.clique
+    WHERE users_in_clique.userid = $1
+  `, [req.user])
+  .then((db_res) => {
+    res.status(200).send(db_res.rows);
+  }).catch((err) => {
+    res.status(500).send(err);
+  });
+});
+
+app.get("/clique/:clique_id", auth, (req, res) => {
+  db.query(`
+    SELECT e.name, e.location, e.date, array_agg(DISTINCT i.id) AS images, array_agg(DISTINCT u.username) AS other_users
+      FROM (
+            SELECT e.* FROM 
+              events e
+                INNER JOIN 
+              event_clique_image eci 
+                ON e.id=eci.event
+                INNER JOIN
+              cliques c
+                ON c.id=eci.clique 
+            WHERE c.id=$1
+           ) e, event_clique_image eci, images i, users_in_event uie, users u
+      WHERE e.id = eci.event AND eci.image = i.id AND uie.event = e.id AND uie.userid = u.email
+      GROUP BY e.name, e.location, e.date
+      ORDER BY e.date DESC;
+  `, [req.params.clique_id])
+  .then((db_res) => {
+    res.status(200).send(db_res.rows);
+  }).catch((err) => {
+    res.status(500).send(err);
+  });
 });
 
 app.listen(process.env.BACKEND_PORT, (err) => {
