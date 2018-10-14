@@ -49,7 +49,10 @@ const fileType = require('file-type');
 const jwt = require('jsonwebtoken');
 const uniqid = require('uniqid');
 
-const insert_file = (userid, file) => {
+const identify = require('./identify-test');
+identify.initialize(process.env.GROUP_ID, process.env.GROUP_NAME);
+
+const insert_file = (file) => {
   return new Promise((resolve, reject) => {
     const ext = fileType(file).ext;
     const id = `${uniqid()}.${ext}`;
@@ -154,6 +157,7 @@ app.post('/signup', upload.array('profile_pic', 3), (req, res) => {
   } else if(req.files.length < 3) {
     res.status(400).send('Not enough pics');
   } else {
+    let azure_id = '';
     db.query('SELECT 1 FROM users WHERE email = $1', [
       req.body.email
     ]).then((db_res) => {
@@ -161,26 +165,37 @@ app.post('/signup', upload.array('profile_pic', 3), (req, res) => {
         throw { code: 400, message: "User already exists" };
       } else {
         return Promise.all(req.files.map((file) => {
-          return insert_file(req.body.email, file.buffer);
+          return insert_file(file.buffer);
         }));
       }
     }).then((profile_ids) => {
-      return db.query('INSERT INTO users (email, username, password, profile_pic_1, profile_pic_2, profile_pic_3) VALUES ($1, $2, $3, $4, $5, $6)', [
+      return identify.createUser(process.env.GROUP_ID, req.body.username).then((aid) => {
+        azure_id = aid;
+        return profile_ids;
+      });
+    }).then((profile_ids) => {
+      return db.query('INSERT INTO users (email, username, password, profile_pic_1, profile_pic_2, profile_pic_3, azure_id) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
         req.body.email,
         req.body.username,
         req.body.password,
         profile_ids[0],
         profile_ids[1],
         profile_ids[2],
+        azure_id,
       ]);
+    }).then(() => {
+      return identify.addFaces(process.env.GROUP_ID, azure_id, req.files.map(file => file.buffer));
+    }).then(() => {
+      return identify.update(process.env.GROUP_ID);
     }).then(() => {
       res.status(200).send('Success');
     }).catch((err) => {
       console.log(err);
-      if(err.code && err.message && !err.severity) {
+      if(err.code && typeof err.code == 'number' && err.message && !err.severity) {
         res.status(err.code).send(err.message);
       } else {
-        res.status(500).send("Database error");
+        res.send(err);
+        // res.status(500).send("Database error");
       }
     });
   }
@@ -190,6 +205,7 @@ app.post('/images', auth, upload.array('file'), (req, res) => {
   if(!req.files) {
     res.status(400).send('No files');
   } else {
+    let group_means = [];
     Promise.all(req.files.map((file) => {
       return new Promise((resolve, reject) => {
         //TODO: Check fileType for image/jpeg
@@ -201,7 +217,9 @@ app.post('/images', auth, upload.array('file'), (req, res) => {
           metadata.lng = results.tags.GPSLongitude;
           metadata.datetime = results.tags.DateTimeOriginal;
         } catch(e) {}
-        insert_file(req.user, file.buffer).then((id) => { // Insert file into minio
+        let return_val = {};
+        insert_file(file.buffer).then((id) => { // Insert file into minio
+          return_val = { id, ...metadata, buffer: file.buffer };
           //Insert entry into postgres
           return db.query('INSERT INTO images (id, userid, timestamp, lat, lng) VALUES ($1, $2, $3, $4, $5)', [
             id,
@@ -211,7 +229,7 @@ app.post('/images', auth, upload.array('file'), (req, res) => {
             metadata.lng
           ]);
         }).then(() => {
-          resolve({ id, ...metadata, buffer: file.buffer });
+          resolve(return_val);
         }).catch((err) => reject(err));
       });
     })).then((files_data) => {
@@ -229,13 +247,119 @@ app.post('/images', auth, upload.array('file'), (req, res) => {
         if(differences[i] < 3 * difference_sd) { //3 standard deviations threshold
           groups[current_group].push(files_data[i+1]);
         }else{ //If difference is an outlier
+          let group_total = groups[current_group].reduce((acc, val) => acc + val, 0);
+          group_means[current_group] = group_total / groups[current_group].length;
           current_group++;
           groups.push([files_data[i+1]]); //Push into new array entry
         }
       }
+      let group_total = groups[current_group].reduce((acc, val) => acc + val, 0);
+      group_means[current_group] = group_total / groups[current_group].length;
       return groups;
-    }).then((groups) => {
+    }).then((groups) => { //Identify people in photos
+      return Promise.all(groups.map(event => {
+        return Promise.all(event.map(photo => {
+          return identify.identify(process.env.GROUP_ID, photo.buffer);
+        }));
+      }));
+    }).then((groups) => { //Flatten photos
+      return groups.map(group => {
+        return group.reduce((acc, photo) =>  acc.concat(photo.filter(x => !acc.some(y => x == y))), []);
+      });
+    }).then((groups) => { //Find people in an event
+      Promise.all(groups.map((group, i) => {
+        let dominant_clique;
+        return db.query(`
+          SELECT DISTINCT c.id AS id, array_agg(u.azure_id) AS aids FROM (
+          	SELECT * FROM cliques c, users_in_clique uic
+          		WHERE c.id = uic.clique AND uic.userid = $1
+          	) c, users u, users_in_clique uic
+          	WHERE c.id = uic.clique AND u.email = uic.userid
+          	GROUP BY c.id
+        `).then((db_res) => {
+          let proportions = db_res.map((clique) => {
+          let total = clique.aids.reduce((acc, val) => {
+              if(group.some(x => x == val)){
+                return acc + 1;
+              } else {
+                return acc;
+              }
+            }, 0);
+            return total / clique.aids.length;
+          });
+          const max_proportion = Math.max(...proportions);
+          dominant_clique = db_res[db_res.findIndex((elem) => elem == max_proportion)].id;
+          return db.query('SELECT DISTINCT e.* FROM events e, event_clique_image eci WHERE eci.clique = $1 AND eci.event = e.id', [
+            dominant_clique
+          ]);
+        }).then((db_res) => {
+          let events = db_res.rows.sort((a, b) => a.datetime - b.datetime);
+          let differences = [];
+          for(let i = 0; i < events.length - 1; i++){
+            differences.push(events[i+1].datetime - events[i].datetime);
+          }
+          const difference_sum = differences.reduce((acc, val) => acc + val, 0);
+          const difference_mean = difference_sum / differences.length;
+          const difference_sd = Math.sqrt(differences.reduce((acc, val) => acc + Math.pow(val - difference_mean, 2), 0.0) / (differences.length - 1));
 
+          let mean = group_means[i];
+          if(mean > 3 * difference_sd) {
+            return db.query('')
+          } else {
+            let target_event = events.find((elem) => {
+              return Math.abs(elem.datetime - mean) == Math.min(...events.map(e => Math.abs(e.datetime - mean)));
+            }
+            });
+        });
+      }));
+      console.log('-');
+      console.log(groups);
+      return;
+      // return Promise.all(groups.map(event => {
+      //   return Promise.all(event.map(photo => {
+      //     db.query(`
+      //       SELECT DISTINCT c.id, array_agg(u.azure_id) AS aids FROM (
+      //       	SELECT * FROM cliques c, users_in_clique uic
+      //       		WHERE c.id = uic.clique AND uic.userid = $1
+      //       	) c, users u, users_in_clique uic
+      //       	WHERE c.id = uic.clique AND u.email = uic.userid
+      //       	GROUP BY c.id
+      //     `).then((db_res) => {
+      //       let proportions = db_res.map((clique) => {
+      //         let total = clique.aids.reduce((acc, val) => {
+      //           if(photo.some(x => x == val)){
+      //             acc++;
+      //           }
+      //         }, 0);
+      //         return total / clique.aids.length;
+      //       });
+      //       const max_proportion = Math.max(...proportions);
+      //       let dominant_clique = db_res[db_res.findIndex((elem) => elem == max_proportion)];
+      //       return dominant_clique;
+      //     });
+      //     // return db.query(`
+      //     //   SELECT COUNT(aids.*) / COUNT(aids_total) AS proportion, aids_total.clique_id AS clique_id FROM (
+      //     //     SELECT DISTINCT u.azure_id AS azure_id, c.id AS clique_id FROM (
+      //     //       SELECT c.* FROM cliques c, users_in_clique uic WHERE c.id = uic.clique AND uic.userid = $1
+      //     //     ) c, users_in_clique uic, users u WHERE c.id = uic.clique AND uic.userid = u.email
+      //     //   ) aids, (
+      //     //     SELECT DISTINCT u.azure_id AS azure_id, c.id AS clique_id FROM (
+      //     //       SELECT c.* FROM cliques c, users_in_clique uic WHERE c.id = uic.clique AND uic.userid = $1
+      //     //     ) c, users_in_clique uic, users u WHERE c.id = uic.clique AND uic.userid = u.email
+      //     //   ) aids_total WHERE aids.azure_id = ANY($2) GROUP BY aids_total.clique_id
+      //     //   `, [
+      //     //     req.user,
+      //     //     photo
+      //     //   ]);
+      //   }));
+      // }));
+    }).then((groups) => {
+      console.log(groups);
+      res.send(groups);
+    }).catch((err) => {
+      console.log('died');
+      // console.log(err);
+      res.status(500).send(err);
     });
   }
 });

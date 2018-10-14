@@ -26,6 +26,8 @@ services:
     build: ./backend
     environment:
       - BACKEND_PORT=10200
+      - GROUP_ID=orcas
+      - GROUP_NAME=orcas
       - SECRET=SECRET
       - MAX_SIZE=2000000000 #2GB
       - PG_HOST=pg
