@@ -399,7 +399,7 @@ app.post('/images', auth, upload.array('file'), (req, res) => {
               dominant_clique,
               file.id
             ]);
-          }))          r
+          }));          
         });
       }));
     }).then((groups) => {
