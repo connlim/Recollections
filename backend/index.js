@@ -68,7 +68,10 @@ const fileType = require('file-type');
 const jwt = require('jsonwebtoken');
 const uniqid = require('uniqid');
 
-const insert_file = (userid, file) => {
+const identify = require('./identify-test');
+identify.initialize(process.env.GROUP_ID, process.env.GROUP_NAME);
+
+const insert_file = (file) => {
   return new Promise((resolve, reject) => {
     const ext = fileType(file).ext;
     const id = `${uniqid()}.${ext}`;
@@ -144,7 +147,7 @@ app.get('/recollections', auth, (req, res) => {
   db.query(`
     SELECT e.name, e.location, e.date, array_agg(DISTINCT i.id) AS images, array_agg(DISTINCT u.username) AS other_users
     FROM (
-          SELECT events.* FROM events 
+          SELECT events.* FROM events
           INNER JOIN users_in_event ON events.id = users_in_event.event
           WHERE users_in_event.userid = $1
          ) e, event_clique_image eci, images i, users_in_event uie, users u
@@ -202,6 +205,7 @@ app.post('/signup', upload.array('profile_pic', 3), (req, res) => {
   } else if(req.files.length < 3) {
     res.status(400).send('Not enough pics');
   } else {
+    let azure_id = '';
     db.query('SELECT 1 FROM users WHERE email = $1', [
       req.body.email
     ]).then((db_res) => {
@@ -209,26 +213,37 @@ app.post('/signup', upload.array('profile_pic', 3), (req, res) => {
         throw { code: 400, message: "User already exists" };
       } else {
         return Promise.all(req.files.map((file) => {
-          return insert_file(req.body.email, file.buffer);
+          return insert_file(file.buffer);
         }));
       }
     }).then((profile_ids) => {
-      return db.query('INSERT INTO users (email, username, password, profile_pic_1, profile_pic_2, profile_pic_3) VALUES ($1, $2, $3, $4, $5, $6)', [
+      return identify.createUser(process.env.GROUP_ID, req.body.username).then((aid) => {
+        azure_id = aid;
+        return profile_ids;
+      });
+    }).then((profile_ids) => {
+      return db.query('INSERT INTO users (email, username, password, profile_pic_1, profile_pic_2, profile_pic_3, azure_id) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
         req.body.email,
         req.body.username,
         req.body.password,
         profile_ids[0],
         profile_ids[1],
         profile_ids[2],
+        azure_id,
       ]);
+    }).then(() => {
+      return identify.addFaces(process.env.GROUP_ID, azure_id, req.files.map(file => file.buffer));
+    }).then(() => {
+      return identify.update(process.env.GROUP_ID);
     }).then(() => {
       res.status(200).send('Success');
     }).catch((err) => {
       console.log(err);
-      if(err.code && err.message && !err.severity) {
+      if(err.code && typeof err.code == 'number' && err.message && !err.severity) {
         res.status(err.code).send(err.message);
       } else {
-        res.status(500).send("Database error");
+        res.send(err);
+        // res.status(500).send("Database error");
       }
     });
   }
@@ -238,6 +253,9 @@ app.post('/images', auth, upload.array('file'), (req, res) => {
   if(!req.files) {
     res.status(400).send('No files');
   } else {
+    let group_means = [];
+    let locations = [];
+    let grouped_files = [];
     Promise.all(req.files.map((file) => {
       return new Promise((resolve, reject) => {
         //TODO: Check fileType for image/jpeg
@@ -249,7 +267,9 @@ app.post('/images', auth, upload.array('file'), (req, res) => {
           metadata.lng = results.tags.GPSLongitude;
           metadata.datetime = results.tags.DateTimeOriginal;
         } catch(e) {}
-        insert_file(req.user, file.buffer).then((id) => { // Insert file into minio
+        let return_val = {};
+        insert_file(file.buffer).then((id) => { // Insert file into minio
+          return_val = { id, ...metadata, buffer: file.buffer };
           //Insert entry into postgres
           return db.query('INSERT INTO images (id, userid, timestamp, lat, lng) VALUES ($1, $2, $3, $4, $5)', [
             id,
@@ -259,7 +279,7 @@ app.post('/images', auth, upload.array('file'), (req, res) => {
             metadata.lng
           ]);
         }).then(() => {
-          resolve({ id, ...metadata, buffer: file.buffer });
+          resolve(return_val);
         }).catch((err) => reject(err));
       });
     })).then((files_data) => {
@@ -277,13 +297,118 @@ app.post('/images', auth, upload.array('file'), (req, res) => {
         if(differences[i] < 3 * difference_sd) { //3 standard deviations threshold
           groups[current_group].push(files_data[i+1]);
         }else{ //If difference is an outlier
+          let group_total = groups[current_group].reduce((acc, val) => acc + val.datetime, 0);
+          group_means[current_group] = group_total / groups[current_group].length;
+          let mean_lat = groups[current_group].reduce((acc, val) => acc + val.lat, 0) / groups[current_group].length;
+          let mean_lng = groups[current_group].reduce((acc, val) => acc + val.lng, 0) / groups[current_group].length;
+          locations[current_group] = reverseGeocode(mean_lat, mean_lng);
+
           current_group++;
           groups.push([files_data[i+1]]); //Push into new array entry
         }
       }
+      let group_total = groups[current_group].reduce((acc, val) => acc + val.datetime, 0);
+      group_means[current_group] = group_total / groups[current_group].length;
+      let mean_lat = groups[current_group].reduce((acc, val) => acc + val.lat, 0) / groups[current_group].length;
+      let mean_lng = groups[current_group].reduce((acc, val) => acc + val.lng, 0) / groups[current_group].length;
+      locations[current_group] = reverseGeocode(mean_lat, mean_lng);
       return groups;
-    }).then((groups) => {
+    }).then((groups) => { //Identify people in photos
+      grouped_files = groups;
+      return Promise.all(groups.map(event => {
+        return Promise.all(event.map(photo => {
+          return identify.identify(process.env.GROUP_ID, photo.buffer);
+        }));
+      }));
+    }).then((groups) => { //Flatten photos
+      return groups.map(group => {
+        return group.reduce((acc, photo) =>  acc.concat(photo.filter(x => !acc.some(y => x == y))), []);
+      });
+    }).then((groups) => { //Find people in an event
+      console.log(2);
+      return Promise.all(groups.map((group, i) => {
+        console.log(`${group}, ${i}`);
+        console.log(grouped_files);
+        let dominant_clique;
+        let event_id;
+        return db.query(`
+          SELECT DISTINCT c.id AS id, array_agg(u.azure_id) AS aids FROM (
+          	SELECT * FROM cliques c, users_in_clique uic
+          		WHERE c.id = uic.clique AND uic.userid = $1
+          	) c, users u, users_in_clique uic
+          	WHERE c.id = uic.clique AND u.email = uic.userid
+          	GROUP BY c.id
+        `, [
+          req.user
+        ]).then((db_res) => {
+          console.log(db_res.rows);
+          let proportions = db_res.map((clique) => {
+            let total = clique.aids.reduce((acc, val) => {
+              if(group.some(x => x == val)){
+                return acc + 1;
+              } else {
+                return acc;
+              }
+            }, 0);
+            return total / clique.aids.length;
+          });
+          console.log(proportions);
+          const max_proportion = Math.max(...proportions);
+          dominant_clique = db_res[db_res.findIndex((elem) => elem == max_proportion)].id;
+          return db.query('SELECT DISTINCT e.* FROM events e, event_clique_image eci WHERE eci.clique = $1 AND eci.event = e.id', [
+            dominant_clique
+          ]);
+        }).then((db_res) => {
+          console.log(4);
+          let events = db_res.rows.sort((a, b) => a.datetime - b.datetime);
+          let differences = [];
+          for(let i = 0; i < events.length - 1; i++){
+            differences.push(events[i+1].datetime - events[i].datetime);
+          }
+          const difference_sum = differences.reduce((acc, val) => acc + val, 0);
+          const difference_mean = difference_sum / differences.length;
+          const difference_sd = Math.sqrt(differences.reduce((acc, val) => acc + Math.pow(val - difference_mean, 2), 0.0) / (differences.length - 1));
 
+          let mean = group_means[i];
+          console.log(mean);
+          if(mean > 3 * difference_sd) {
+            return db.query('INSERT INTO events (name, location, date) VALUES ($1, $2, $3) RETURNING id', [
+              `${mean % 24 < 12 ? 'Morning' : 'Afternoon'} at ${locations[i]}`,
+              locations[i],
+              mean
+            ]).then((db_res) => {
+              return db_res.rows[0].id;
+            });
+          } else {
+            let target_event = events.find((elem) => {
+              return Math.abs(elem.datetime - mean) == Math.min(...events.map(e => Math.abs(e.datetime - mean)));
+            });
+            return target_event;
+          };
+        }).then((eid) => {
+          event_id = eid;
+          console.log(5);
+          return db.query('SELECT email, azure_id FROM users').then((db_res) => {
+            let values = group.map(val => `(${event_id}, ${db_res.find(elem => elem.azure_id == val).email})`).join(', ');
+            return db.query(`INSERT INTO users_in_event (event, userid) VALUES ${values}`);
+          });
+        }).then(() => {
+          return Promise.all(grouped_files[i].map(file => {
+            return db.query('INSERT INTO event_clique_image (event, clique, image) VALUES ($1, $2, $3)', [
+              event_id,
+              dominant_clique,
+              file.id
+            ]);
+          }))          r
+        });
+      }));
+    }).then((groups) => {
+      console.log(groups);
+      res.status(200).send("Success");
+    }).catch((err) => {
+      console.log('died');
+      // console.log(err);
+      res.status(500).send(err);
     });
   }
 });

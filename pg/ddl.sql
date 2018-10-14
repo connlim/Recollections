@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS users (
   password TEXT NOT NULL,
   profile_pic_1 TEXT NOT NULL,
   profile_pic_2 TEXT NOT NULL,
-  profile_pic_3 TEXT NOT NULL
+  profile_pic_3 TEXT NOT NULL,
+  azure_id TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS images (
